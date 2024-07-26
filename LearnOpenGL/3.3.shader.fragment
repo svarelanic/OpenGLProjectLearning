@@ -1,0 +1,54 @@
+#version 330 core
+out vec4 FragColor;
+
+in vec3 Normal;  
+in vec3 FragPos; 
+in vec2 TexCoords;
+
+//Define material properties in CPU and send them as uniform to GPU
+struct Material {
+    sampler2D diffuse; //diffuse map
+    sampler2D specular; //specular map (black and white, the whitest the brighter the specular)
+    float     shininess;
+}; 
+
+//Define light properties in CPU and send them as uniform to GPU
+struct Light {
+    vec3 position;
+  
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
+};
+
+uniform Material material;
+uniform Light light;
+uniform vec3 viewPos; //for specular ligthing calc
+
+
+
+void main()
+{
+    //Ambient lighting:
+    vec3 ambient = light.ambient * texture(material.diffuse, TexCoords).rgb; //Sample texture and multiply by ambient intensity
+    
+    //Diffuse lighting:
+    //Light Direction vector: calculated by getting the normilized difference between ligth position and fragment position. Also normalize the Normal vector for later use:
+    vec3 norm = normalize(Normal);
+    vec3 lightDir = normalize(light.position - FragPos); 
+    //calculate the diffuse impact of the light on the current fragment -> Dot product between ligt direction and normal:
+    float diff = max(dot(norm, lightDir), 0.0); //use max to ensure it never returns a negative value
+    vec3 diffuse = light.diffuse * diff * texture(material.diffuse, TexCoords).rgb; //Sample the texture and multiply it by the diffuse angle (also multiplied by the diffuse intensity set in the light struct)
+
+    //Specular lighting: 
+    //Calc view direction (using the camera position and the fragment position) and reflected light (reflecting the light direction around the normal)
+    vec3 viewDir = normalize(viewPos - FragPos);
+    vec3 reflectDir = reflect(-lightDir, norm); //negate light direction since reflect function expects the first vector to point from ligth source to the cube (right now it's the opposite)
+    //calc the Specular component:
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess); //get the dot product between view direction and reflected light, then multiply by material's shininess
+    vec3 specular = light.specular * spec * texture(material.specular, TexCoords).rgb; //The higher the specular component of the material, the more concetrated the highlight is
+
+    //Defining color:
+    vec3 result = ambient + diffuse + specular;
+    FragColor = vec4(result, 1.0);
+}
